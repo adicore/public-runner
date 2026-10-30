@@ -1,0 +1,35 @@
+name: Global Client License Sync
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [license-sync]
+
+jobs:
+  sync-licenses:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v4
+        with:
+          repository: adicore/dashboard-pusat
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Execute License Push to Client KVs
+        env:
+          WORKER_PUSAT_URL: ${{ secrets.WORKER_PUSAT_URL || 'https://dashboard-admin-pusat.accessed.workers.dev' }}
+          MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+          CF_GLOBAL_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_GLOBAL_API_TOKEN }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MAIN_WORKER_NAME: ${{ secrets.MAIN_WORKER_NAME }}
+        run: node scripts/push-licenses-to-clients.js

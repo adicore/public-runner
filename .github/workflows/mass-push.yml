@@ -1,0 +1,40 @@
+name: Mass Push Templates & Worker Code to Clients
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [mass-push]
+
+concurrency:
+  group: mass-push-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mass-push:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v4
+        with:
+          repository: adicore/dashboard-pusat
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund --prefer-offline
+
+      - name: Run Mass Push Script
+        run: node scripts/mass-push.js
+        env:
+          PUSAT_WORKER_URL: ${{ secrets.PUSAT_WORKER_URL || 'https://dashboard-admin-pusat.accessed.workers.dev' }}
+          MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+          GITHUB_PAT: ${{ secrets.SYNC_PAT || secrets.GH_PAT || secrets.GITHUB_PAT }}
+          GITHUB_OWNER: ${{ secrets.GITHUB_OWNER || 'adicore' }}

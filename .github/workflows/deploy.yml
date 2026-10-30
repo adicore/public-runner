@@ -1,0 +1,37 @@
+name: Deploy Worker Pusat
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [deploy-worker-pusat, push]
+
+concurrency:
+  group: deploy-pusat-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-pusat:
+    runs-on: ubuntu-latest
+    name: Deploy Worker Pusat ke Cloudflare
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v4
+        with:
+          repository: adicore/dashboard-pusat
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Deploy Worker Pusat ke Cloudflare
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          wranglerVersion: "latest"

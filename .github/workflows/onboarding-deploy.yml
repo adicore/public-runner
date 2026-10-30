@@ -1,0 +1,45 @@
+name: Onboarding Client Deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      client_payload:
+        description: 'JSON Payload Data Klien'
+        required: true
+        type: string
+  repository_dispatch:
+    types: [onboarding-client]
+
+concurrency:
+  group: onboarding-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v4
+        with:
+          repository: adicore/dashboard-pusat
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --no-audit --no-fund || npm install tweetnacl tweetnacl-sealedbox-js --no-audit --no-fund --prefer-offline
+
+      - name: Execute Onboarding Setup
+        run: node scripts/onboarding-deploy.js
+        env:
+          MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+          GITHUB_PAT: ${{ secrets.SYNC_PAT }}
+          PUSAT_WORKER_URL: 'https://dashboard-admin-pusat.accessed.workers.dev'
+          CLIENT_PAYLOAD: ${{ github.event.inputs.client_payload || (github.event.client_payload && toJson(github.event.client_payload)) }}

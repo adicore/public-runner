@@ -29,4 +29,6 @@ jobs:
         env:
           PUSAT_API_URL: ${{ secrets.PUSAT_API_URL }}
           MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
         run: node scripts/audit-usage.js

@@ -3,6 +3,18 @@ import fetch from 'node-fetch';
 
 const PUSAT_API_URL = process.env.PUSAT_API_URL ? process.env.PUSAT_API_URL.replace(/\/$/, '') : '';
 const ADMIN_PASSWORD = process.env.MASS_UPDATE_PASSWORD;
+const CF_ACCESS_CLIENT_ID = process.env.CF_ACCESS_CLIENT_ID || '';
+const CF_ACCESS_CLIENT_SECRET = process.env.CF_ACCESS_CLIENT_SECRET || '';
+
+// Helper untuk menyusun header request ke Worker Pusat (termasuk bypass Zero Trust)
+function getPusatHeaders() {
+  const headers = { 'Content-Type': 'application/json' };
+  if (CF_ACCESS_CLIENT_ID && CF_ACCESS_CLIENT_SECRET) {
+    headers['CF-Access-Client-Id'] = CF_ACCESS_CLIENT_ID;
+    headers['CF-Access-Client-Secret'] = CF_ACCESS_CLIENT_SECRET;
+  }
+  return headers;
+}
 
 async function runAudit() {
   if (!PUSAT_API_URL || !ADMIN_PASSWORD) {
@@ -13,7 +25,7 @@ async function runAudit() {
   console.log("Menarik data master klien dari Worker Pusat...");
   const masterRes = await fetch(`${PUSAT_API_URL}/api/internal/master-data`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getPusatHeaders(),
     body: JSON.stringify({ adminPassword: ADMIN_PASSWORD })
   });
 
@@ -22,7 +34,7 @@ async function runAudit() {
   try {
     masterData = JSON.parse(masterText);
   } catch (err) {
-    console.error("❌ Worker Pusat mengembalikan respons bukan JSON saat mengambil master-data:");
+    console.error("❌ Worker Pusat mengembalikan respons bukan JSON (Terblokir Zero Trust / Route Error):");
     console.error(masterText.substring(0, 300));
     process.exit(1);
   }
@@ -136,7 +148,7 @@ async function runAudit() {
   console.log(`Mengirimkan ${auditResults.length} hasil audit ke D1 Pusat...`);
   const saveRes = await fetch(`${PUSAT_API_URL}/api/complete-usage-audit`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: getPusatHeaders(),
     body: JSON.stringify({
       adminPassword: ADMIN_PASSWORD,
       auditData: auditResults
@@ -149,7 +161,7 @@ async function runAudit() {
   try {
     saveResult = JSON.parse(responseText);
   } catch (err) {
-    console.error("❌ Worker Pusat mengembalikan respons bukan JSON (kemungkinan route /api/complete-usage-audit belum ter-deploy ke Cloudflare):");
+    console.error("❌ Worker Pusat mengembalikan respons bukan JSON saat menyimpan hasil audit:");
     console.error(responseText.substring(0, 300));
     process.exit(1);
   }
@@ -162,7 +174,6 @@ async function runAudit() {
   console.log("✅ Audit kuota massal selesai & berhasil disimpan ke D1 Pusat!");
 }
 
-// Eksekusi fungsi utama dengan penanganan error terpusat
 runAudit().catch(err => {
   console.error("❌ Fatal error saat eksekusi audit-usage.js:", err.message || err);
   process.exit(1);

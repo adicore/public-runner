@@ -1,0 +1,27 @@
+name: Audit Usage Massal Klien
+
+on:
+  repository_dispatch:
+    types: [trigger-usage-audit]
+  workflow_dispatch:
+
+jobs:
+  audit-usage:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install Dependencies
+        run: npm install node-fetch@3
+
+      - name: Run Usage Audit Script
+        env:
+          PUSAT_API_URL: ${{ secrets.PUSAT_API_URL }}
+          MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+        run: node scripts/audit-usage.js

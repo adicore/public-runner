@@ -1,0 +1,130 @@
+// public-runner/scripts/audit-usage.js
+import fetch from 'node-fetch';
+
+const PUSAT_API_URL = process.env.PUSAT_API_URL; // Contoh: https://admin.travego.site
+const ADMIN_PASSWORD = process.env.MASS_UPDATE_PASSWORD;
+
+async function runAudit() {
+  console.log("Menarik data master klien dari Worker Pusat...");
+  const masterRes = await fetch(`${PUSAT_API_URL}/api/internal/master-data`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminPassword: ADMIN_PASSWORD })
+  });
+  
+  const { clients } = await masterRes.json();
+  const auditResults = [];
+
+  for (const client of clients) {
+    let settings = {};
+    try { settings = JSON.parse(client.settings || '{}'); } catch(e){}
+    const secrets = settings.secrets || {};
+    
+    const cfEmail = secrets.CF_EMAIL || settings.CF_EMAIL;
+    const cfGlobalKey = secrets.CF_GLOBAL_KEY || settings.CF_GLOBAL_KEY;
+    const accountId = client.account_id || settings.CF_ACCOUNT_ID;
+    const githubOwner = settings.GITHUB_OWNER || secrets.GITHUB_OWNER;
+    const githubPat = secrets.GITHUB_PAT || secrets.GITHUB_TOKEN;
+
+    const metrics = {
+      worker_name: client.worker_name,
+      updated_at: new Date().toISOString(),
+      worker: { requests_24h: 0, errors_24h: 0, cpu_avg_ms: 0, cpu_p99_ms: 0 },
+      kv: { reads_24h: 0, writes_24h: 0, storage_mb: 0 },
+      d1: { rows_read_24h: 0, rows_written_24h: 0, storage_mb: 0 },
+      github: { minutes_used: 0, minutes_limit: 2000 }
+    };
+
+    // 1. Query GraphQL Cloudflare (Worker CPU, Requests, Errors & KV Ops)
+    if (cfEmail && cfGlobalKey && accountId) {
+      try {
+        const datetimeStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+        const graphqlQuery = {
+          query: `
+            query GetMetrics($accountId: String!, $scriptName: String!, $datetimeStart: String!) {
+              viewer {
+                accounts(filter: {accountTag: $accountId}) {
+                  workersInvocationsAdaptive(filter: {scriptName: $scriptName, datetime_geq: $datetimeStart}, limit: 1000) {
+                    sum { requests errors }
+                    quantiles { cpuTimeP50 cpuTimeP99 }
+                  }
+                  kvOperationsAdaptive(filter: {datetime_geq: $datetimeStart}, limit: 1000) {
+                    sum { requests }
+                    dimensions { action }
+                  }
+                }
+              }
+            }
+          `,
+          variables: { accountId, scriptName: client.worker_name, datetimeStart }
+        };
+
+        const cfRes = await fetch('https://api.cloudflare.com/client/v4/graphql', {
+          method: 'POST',
+          headers: {
+            'X-Auth-Email': cfEmail,
+            'X-Auth-Key': cfGlobalKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(graphqlQuery)
+        });
+        const cfData = await cfRes.json();
+        const accountData = cfData?.data?.viewer?.accounts?.[0];
+
+        if (accountData) {
+          const workerData = accountData.workersInvocationsAdaptive?.[0];
+          if (workerData) {
+            metrics.worker.requests_24h = workerData.sum?.requests || 0;
+            metrics.worker.errors_24h = workerData.sum?.errors || 0;
+            metrics.worker.cpu_avg_ms = ((workerData.quantiles?.cpuTimeP50 || 0) / 1000).toFixed(2);
+            metrics.worker.cpu_p99_ms = ((workerData.quantiles?.cpuTimeP99 || 0) / 1000).toFixed(2);
+          }
+
+          const kvOps = accountData.kvOperationsAdaptive || [];
+          kvOps.forEach(op => {
+            if (op.dimensions?.action === 'read') metrics.kv.reads_24h += op.sum?.requests || 0;
+            if (op.dimensions?.action === 'write') metrics.kv.writes_24h += op.sum?.requests || 0;
+          });
+        }
+      } catch (err) {
+        console.error(`Gagal audit Cloudflare untuk ${client.worker_name}:`, err.message);
+      }
+    }
+
+    // 2. Query GitHub Billing API (Menit Actions)
+    if (githubOwner && githubPat) {
+      try {
+        const ghRes = await fetch(`https://api.github.com/users/${githubOwner}/settings/billing/actions`, {
+          headers: {
+            'Authorization': `Bearer ${githubPat}`,
+            'Accept': 'application/vnd.github+json',
+            'User-Agent': 'CMS-Audit'
+          }
+        });
+        if (ghRes.ok) {
+          const ghBilling = await ghRes.json();
+          metrics.github.minutes_used = ghBilling.total_minutes_used || 0;
+          metrics.github.minutes_limit = ghBilling.included_minutes || 2000;
+        }
+      } catch (err) {
+        console.error(`Gagal audit GitHub Billing untuk ${githubOwner}:`, err.message);
+      }
+    }
+
+    auditResults.push(metrics);
+  }
+
+  // Kirim hasil audit kembali ke Worker Pusat
+  console.log("Mengirimkan hasil audit ke D1 Pusat...");
+  await fetch(`${PUSAT_API_URL}/api/complete-usage-audit`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      adminPassword: ADMIN_PASSWORD,
+      auditData: auditResults
+    })
+  });
+  console.log("Audit kuota massal selesai!");
+}
+
+runAudit();

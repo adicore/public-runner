@@ -1,4 +1,4 @@
-name: Deploy Worker Pusat
+name: Deploy ke Worker Pusat
 
 on:
   workflow_dispatch:

@@ -17,8 +17,13 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Install Dependencies
-        run: npm install node-fetch@3
+      - name: Initialize Package JSON & Install Dependencies
+        run: |
+          if [ ! -f package.json ]; then
+            npm init -y
+          fi
+          npm pkg set type="module"
+          npm install node-fetch@3
 
       - name: Run Usage Audit Script
         env:

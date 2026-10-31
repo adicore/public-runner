@@ -1,10 +1,15 @@
 // public-runner/scripts/audit-usage.js
 import fetch from 'node-fetch';
 
-const PUSAT_API_URL = process.env.PUSAT_API_URL;
+const PUSAT_API_URL = process.env.PUSAT_API_URL ? process.env.PUSAT_API_URL.replace(/\/$/, '') : '';
 const ADMIN_PASSWORD = process.env.MASS_UPDATE_PASSWORD;
 
 async function runAudit() {
+  if (!PUSAT_API_URL || !ADMIN_PASSWORD) {
+    console.error("❌ Error: Secrets PUSAT_API_URL atau MASS_UPDATE_PASSWORD belum dikonfigurasi di GitHub Secrets!");
+    process.exit(1);
+  }
+
   console.log("Menarik data master klien dari Worker Pusat...");
   const masterRes = await fetch(`${PUSAT_API_URL}/api/internal/master-data`, {
     method: 'POST',
@@ -12,7 +17,16 @@ async function runAudit() {
     body: JSON.stringify({ adminPassword: ADMIN_PASSWORD })
   });
 
-  const masterData = await masterRes.json();
+  const masterText = await masterRes.text();
+  let masterData;
+  try {
+    masterData = JSON.parse(masterText);
+  } catch (err) {
+    console.error("❌ Worker Pusat mengembalikan respons bukan JSON saat mengambil master-data:");
+    console.error(masterText.substring(0, 300));
+    process.exit(1);
+  }
+
   if (!masterRes.ok || masterData.error) {
     console.error("❌ Gagal menarik master data:", masterData);
     process.exit(1);
@@ -119,7 +133,7 @@ async function runAudit() {
     auditResults.push(metrics);
   }
 
-console.log(`Mengirimkan ${auditResults.length} hasil audit ke D1 Pusat...`);
+  console.log(`Mengirimkan ${auditResults.length} hasil audit ke D1 Pusat...`);
   const saveRes = await fetch(`${PUSAT_API_URL}/api/complete-usage-audit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -135,7 +149,7 @@ console.log(`Mengirimkan ${auditResults.length} hasil audit ke D1 Pusat...`);
   try {
     saveResult = JSON.parse(responseText);
   } catch (err) {
-    console.error("❌ Worker Pusat mengembalikan respons bukan JSON (kemungkinan route belum ter-deploy/HTML 404):");
+    console.error("❌ Worker Pusat mengembalikan respons bukan JSON (kemungkinan route /api/complete-usage-audit belum ter-deploy ke Cloudflare):");
     console.error(responseText.substring(0, 300));
     process.exit(1);
   }
@@ -145,5 +159,11 @@ console.log(`Mengirimkan ${auditResults.length} hasil audit ke D1 Pusat...`);
     process.exit(1);
   }
 
-  console.log("Audit kuota massal selesai & berhasil disimpan ke D1 Pusat!");
+  console.log("✅ Audit kuota massal selesai & berhasil disimpan ke D1 Pusat!");
 }
+
+// Eksekusi fungsi utama dengan penanganan error terpusat
+runAudit().catch(err => {
+  console.error("❌ Fatal error saat eksekusi audit-usage.js:", err.message || err);
+  process.exit(1);
+});

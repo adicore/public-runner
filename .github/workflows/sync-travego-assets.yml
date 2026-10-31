@@ -1,0 +1,47 @@
+name: Sync Public Assets to CDN Repo
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+    types: [sync-travego-assets]
+
+concurrency:
+  group: sync-travego-assets-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sync-assets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout Private Repository (dashboard_travego)
+        uses: actions/checkout@v4
+        with:
+          repository: adicore/dashboard_travego
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+
+      - name: Sync & Push Aset Statis ke Repo Publik (jsDelivr)
+        env:
+          GH_PAT: ${{ secrets.SYNC_PAT || secrets.GH_PAT || secrets.GITHUB_PAT }}
+          GH_OWNER: ${{ secrets.GH_OWNER || 'adicore' }}
+        run: |
+          echo "🔄 Menyinkronkan file aset statis secara real-time..."
+          
+          git clone https://${GH_PAT}@github.com/${GH_OWNER}/dashboard-assets.git temp-assets
+          
+          # Hapus aset lama di repo publik agar bersih
+          rm -rf temp-assets/assets
+          
+          # Salin aset terbaru dari proyek ini
+          mkdir -p temp-assets/assets
+          cp -r assets/* temp-assets/assets/
+          
+          cd temp-assets
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .
+          git diff-index --quiet HEAD || git commit -m "chore: real-time auto-sync static assets [skip ci]"
+          git push origin main
+          echo "✅ Aset statis berhasil diperbarui secara real-time ke CDN!"

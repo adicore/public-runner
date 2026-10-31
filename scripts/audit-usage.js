@@ -1,7 +1,7 @@
 // public-runner/scripts/audit-usage.js
 import fetch from 'node-fetch';
 
-const PUSAT_API_URL = process.env.PUSAT_API_URL; // Contoh: https://admin.travego.site
+const PUSAT_API_URL = process.env.PUSAT_API_URL;
 const ADMIN_PASSWORD = process.env.MASS_UPDATE_PASSWORD;
 
 async function runAudit() {
@@ -11,8 +11,15 @@ async function runAudit() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ adminPassword: ADMIN_PASSWORD })
   });
-  
-  const { clients } = await masterRes.json();
+
+  const masterData = await masterRes.json();
+  if (!masterRes.ok || masterData.error) {
+    console.error("❌ Gagal menarik master data:", masterData);
+    process.exit(1);
+  }
+
+  const clients = masterData.clients || [];
+  console.log(`Ditemukan ${clients.length} klien untuk diaudit.`);
   const auditResults = [];
 
   for (const client of clients) {
@@ -35,7 +42,6 @@ async function runAudit() {
       github: { minutes_used: 0, minutes_limit: 2000 }
     };
 
-    // 1. Query GraphQL Cloudflare (Worker CPU, Requests, Errors & KV Ops)
     if (cfEmail && cfGlobalKey && accountId) {
       try {
         const datetimeStart = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -87,11 +93,10 @@ async function runAudit() {
           });
         }
       } catch (err) {
-        console.error(`Gagal audit Cloudflare untuk ${client.worker_name}:`, err.message);
+        console.error(`Gagal audit Cloudflare (${client.worker_name}):`, err.message);
       }
     }
 
-    // 2. Query GitHub Billing API (Menit Actions)
     if (githubOwner && githubPat) {
       try {
         const ghRes = await fetch(`https://api.github.com/users/${githubOwner}/settings/billing/actions`, {
@@ -107,16 +112,15 @@ async function runAudit() {
           metrics.github.minutes_limit = ghBilling.included_minutes || 2000;
         }
       } catch (err) {
-        console.error(`Gagal audit GitHub Billing untuk ${githubOwner}:`, err.message);
+        console.error(`Gagal audit GitHub Billing (${githubOwner}):`, err.message);
       }
     }
 
     auditResults.push(metrics);
   }
 
-  // Kirim hasil audit kembali ke Worker Pusat
-  console.log("Mengirimkan hasil audit ke D1 Pusat...");
-  await fetch(`${PUSAT_API_URL}/api/complete-usage-audit`, {
+  console.log(`Mengirimkan ${auditResults.length} hasil audit ke D1 Pusat...`);
+  const saveRes = await fetch(`${PUSAT_API_URL}/api/complete-usage-audit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -124,7 +128,16 @@ async function runAudit() {
       auditData: auditResults
     })
   });
-  console.log("Audit kuota massal selesai!");
+
+  const saveResult = await saveRes.json();
+  console.log("Respon dari Worker Pusat:", saveResult);
+
+  if (!saveRes.ok || saveResult.error) {
+    console.error("❌ Gagal menyimpan ke D1 Pusat:", saveResult);
+    process.exit(1);
+  }
+
+  console.log("Audit kuota massal selesai & berhasil disimpan!");
 }
 
 runAudit();

@@ -119,7 +119,7 @@ async function runAudit() {
     auditResults.push(metrics);
   }
 
-  console.log(`Mengirimkan ${auditResults.length} hasil audit ke D1 Pusat...`);
+console.log(`Mengirimkan ${auditResults.length} hasil audit ke D1 Pusat...`);
   const saveRes = await fetch(`${PUSAT_API_URL}/api/complete-usage-audit`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -129,15 +129,21 @@ async function runAudit() {
     })
   });
 
-  const saveResult = await saveRes.json();
-  console.log("Respon dari Worker Pusat:", saveResult);
+  const responseText = await saveRes.text();
+  let saveResult;
+
+  try {
+    saveResult = JSON.parse(responseText);
+  } catch (err) {
+    console.error("❌ Worker Pusat mengembalikan respons bukan JSON (kemungkinan route belum ter-deploy/HTML 404):");
+    console.error(responseText.substring(0, 300));
+    process.exit(1);
+  }
 
   if (!saveRes.ok || saveResult.error) {
     console.error("❌ Gagal menyimpan ke D1 Pusat:", saveResult);
     process.exit(1);
   }
 
-  console.log("Audit kuota massal selesai & berhasil disimpan!");
+  console.log("Audit kuota massal selesai & berhasil disimpan ke D1 Pusat!");
 }
-
-runAudit();

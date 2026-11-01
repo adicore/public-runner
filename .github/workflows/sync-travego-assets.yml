@@ -24,8 +24,8 @@ jobs:
 
       - name: Sync & Push Aset Statis ke Repo Publik (jsDelivr)
         env:
-          GH_PAT: ${{ secrets.SYNC_PAT || secrets.GH_PAT || secrets.GITHUB_PAT }}
-          GH_OWNER: ${{ secrets.GH_OWNER || 'adicore' }}
+          GH_PAT: ${{ secrets.SYNC_PAT }}
+          GH_OWNER: ${{ secrets.GH_OWNER }}
         run: |
           echo "🔄 Menyinkronkan file aset statis secara real-time..."
           

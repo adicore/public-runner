@@ -43,8 +43,8 @@ jobs:
 
       - name: Push Compiled Worker Code ke Repo dashboard-pusat
         env:
-          GH_PAT: ${{ secrets.SYNC_PAT || secrets.GH_PAT || secrets.GITHUB_PAT }}
-          GH_OWNER: ${{ secrets.GH_OWNER || 'adicore' }}
+          GH_PAT: ${{ secrets.SYNC_PAT }}
+          GH_OWNER: ${{ secrets.GH_OWNER }}
         run: |
           echo "🔄 Menyimpan hasil build ke repo dashboard-pusat..."
           git clone https://${GH_PAT}@github.com/${GH_OWNER}/dashboard-pusat.git temp-pusat

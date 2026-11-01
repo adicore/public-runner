@@ -1,0 +1,49 @@
+name: Obfuscate & Deploy CMS Assets
+
+on:
+  repository_dispatch:
+    types: [trigger-cms-build]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Private Repository
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.MAIN_REPO_OWNER }}/${{ secrets.MAIN_REPO_NAME }}
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Auto-Inject Security Guard & Obfuscate All JS
+        run: |
+          npm install -g javascript-obfuscator
+          mkdir -p dist/js dist/css
+          
+          # 1. Tempelkan security-guard.js ke awal setiap file JS di assets/js/ (kecuali vendor jika ada)
+          for file in assets/js/*.js; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              # Gabungkan guard snippet dengan isi asli file
+              cat assets/security-guard.js "$file" > "dist/js/$filename"
+            fi
+          done
+
+          # 2. Obfuscate seluruh file JS yang sudah dipasangi guard di dist/js/
+          javascript-obfuscator dist/js --output dist/js --config obfuscator.json
+
+          # 3. Salin seluruh file CSS dari assets/css ke dist/css
+          cp -r assets/css/* dist/css/
+
+      - name: Deploy to Cloudflare Pages via Wrangler
+        run: npx wrangler pages deploy dist --project-name=static-files-cms
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

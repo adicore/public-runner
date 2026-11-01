@@ -25,9 +25,9 @@ jobs:
 
       - name: Execute License Push to Client KVs
         env:
-          WORKER_PUSAT_URL: ${{ secrets.WORKER_PUSAT_URL || 'https://dashboard-admin-pusat.accessed.workers.dev' }}
+          WORKER_PUSAT_URL: ${{ secrets.PUSAT_API_URL }}
           MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
-          CF_GLOBAL_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN || secrets.CF_GLOBAL_API_TOKEN }}
+          CF_GLOBAL_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

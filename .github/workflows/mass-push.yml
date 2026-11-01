@@ -34,7 +34,7 @@ jobs:
       - name: Run Mass Push Script
         run: node scripts/mass-push.js
         env:
-          PUSAT_WORKER_URL: ${{ secrets.PUSAT_WORKER_URL || 'https://dashboard-admin-pusat.accessed.workers.dev' }}
+          PUSAT_WORKER_URL: ${{ secrets.PUSAT_API_URL }}
           MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
-          GITHUB_PAT: ${{ secrets.SYNC_PAT || secrets.GH_PAT || secrets.GITHUB_PAT }}
-          GITHUB_OWNER: ${{ secrets.GITHUB_OWNER || 'adicore' }}
+          GITHUB_PAT: ${{ secrets.SYNC_PAT }}
+          GITHUB_OWNER: ${{ secrets.GH_OWNER || 'adicore' }}

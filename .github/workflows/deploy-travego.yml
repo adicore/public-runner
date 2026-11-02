@@ -1,4 +1,4 @@
-name: Deploy Worker Utama Pribadi, Sync Build ke Dashboard Pusat, & Deploy Massal ke Seluruh Worker Klien
+name: Deploy Worker Utama Pribadi & Mass Deploy Clients
 
 on:
   workflow_dispatch:

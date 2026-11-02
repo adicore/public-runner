@@ -3,7 +3,7 @@ name: Deploy ke Worker Pusat
 on:
   workflow_dispatch:
   repository_dispatch:
-    types: [deploy-worker-pusat, push]
+    types: [deploy-worker-pusat]
 
 concurrency:
   group: deploy-pusat-${{ github.ref }}

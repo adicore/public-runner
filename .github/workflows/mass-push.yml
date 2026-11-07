@@ -37,4 +37,6 @@ jobs:
           PUSAT_WORKER_URL: ${{ secrets.PUSAT_API_URL }}
           MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
           GITHUB_PAT: ${{ secrets.SYNC_PAT }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           GITHUB_OWNER: ${{ secrets.GH_OWNER || 'adicore' }}

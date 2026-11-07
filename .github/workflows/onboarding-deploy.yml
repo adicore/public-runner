@@ -40,6 +40,8 @@ jobs:
         run: node scripts/onboarding-deploy.js
         env:
           MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           GITHUB_PAT: ${{ secrets.SYNC_PAT }}
           PUSAT_WORKER_URL: 'https://dashboard-admin-pusat.accessed.workers.dev'
           CLIENT_PAYLOAD: ${{ github.event.inputs.client_payload || (github.event.client_payload && toJson(github.event.client_payload)) }}

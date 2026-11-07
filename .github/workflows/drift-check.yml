@@ -38,4 +38,6 @@ jobs:
         env:
           MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
           GITHUB_PAT: ${{ secrets.SYNC_PAT }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           PUSAT_WORKER_URL: 'https://dashboard-admin-pusat.accessed.workers.dev'

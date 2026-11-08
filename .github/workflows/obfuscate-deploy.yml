@@ -27,14 +27,20 @@ jobs:
           npm install -g javascript-obfuscator
           mkdir -p dist/js dist/css
           
-          for file in assets/js/*.js; do
-            if [ -f "$file" ]; then
-              filename=$(basename "$file")
-              cat assets/security-guard.js "$file" > "dist/js/$filename"
-            fi
+          # 1. Salin seluruh isi assets/js termasuk subfolder (modules/) ke dist/js
+          cp -r assets/js/* dist/js/
+
+          # 2. Inject security-guard.js ke seluruh file .js (termasuk yang ada di dalam subfolder)
+          find dist/js -type f -name "*.js" | while read -r file; do
+            tmpfile=$(mktemp)
+            cat assets/security-guard.js "$file" > "$tmpfile"
+            mv "$tmpfile" "$file"
           done
 
+          # 3. Obfuscate seluruh file JS secara rekursif di dalam folder dist/js
           javascript-obfuscator dist/js --output dist/js --config obfuscator.json
+          
+          # 4. Salin seluruh file CSS
           cp -r assets/css/* dist/css/
 
       - name: Deploy to Cloudflare Pages via Wrangler

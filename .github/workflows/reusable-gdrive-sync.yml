@@ -1,17 +1,43 @@
-name: Reusable Sync Repo to Google Drive
+name: Sync Any Repo to Google Drive
 
 on:
-  workflow_call:
-    secrets:
-      GDRIVE_TOKEN_JSON:
+  repository_dispatch:
+    types: [sync-repo-to-gdrive]
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      repo_name:
+        description: 'Nama repo yang akan disinkronkan'
         required: true
+        
+concurrency:
+  group: gdrive-sync-${{ github.event.client_payload.repo_name || github.event.inputs.repo_name || github.event.repository.name }}
+  cancel-in-progress: false
 
 jobs:
   sync-to-gdrive:
     runs-on: ubuntu-latest
     steps:
+      - name: Tentukan Nama Repository
+        id: meta
+        run: |
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            REPO="${{ github.event.client_payload.repo_name }}"
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            REPO="${{ github.event.inputs.repo_name }}"
+          else
+            REPO="${{ github.event.repository.name }}"
+          fi
+          echo "repo_name=$REPO" >> $GITHUB_OUTPUT
+
       - name: Checkout Kode Repository
         uses: actions/checkout@v4
+        with:
+          repository: adicore/${{ steps.meta.outputs.repo_name }}
+          token: ${{ secrets.GH_PAT }}
 
       - name: Install Rclone
         run: |
@@ -20,17 +46,19 @@ jobs:
           sudo cp rclone-*-linux-amd64/rclone /usr/local/bin/
           sudo chmod +x /usr/local/bin/rclone
 
-      - name: Sync ke Google Drive
+      - name: Sync ke Google Drive (Incremental)
         env:
           RCLONE_CONFIG_GDRIVE_TYPE: drive
           RCLONE_CONFIG_GDRIVE_SCOPE: drive
           RCLONE_CONFIG_GDRIVE_TOKEN: ${{ secrets.GDRIVE_TOKEN_JSON }}
-          REPO_NAME: ${{ github.event.repository.name }}
+          REPO_NAME: ${{ steps.meta.outputs.repo_name }}
         run: |
           rclone sync ./ "gdrive:Dashboard_System/${REPO_NAME}" \
             --exclude ".git/**" \
             --exclude ".github/**" \
             --exclude "node_modules/**" \
             --exclude ".wrangler/**" \
+            --fast-list \
+            --checkers 16 \
             --transfers 8 \
             --verbose

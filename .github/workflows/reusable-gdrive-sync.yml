@@ -55,7 +55,6 @@ jobs:
         run: |
           rclone sync ./ "gdrive:Dashboard_System/${REPO_NAME}" \
             --exclude ".git/**" \
-            --exclude ".github/**" \
             --exclude "node_modules/**" \
             --exclude ".wrangler/**" \
             --fast-list \

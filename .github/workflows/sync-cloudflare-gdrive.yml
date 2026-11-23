@@ -1,9 +1,9 @@
-name: Sync Cloudflare D1 & Worker Envs to Google Drive
+name: Sync Cloudflare Env & D1 Schema to Google Drive
 
 on:
   schedule:
-    - cron: '0 */6 * * *' # Otomatis jalan setiap 6 jam
-  workflow_dispatch:       # Bisa dijalankan manual kapan saja dari tab Actions
+    - cron: '0 */12 * * *' # Otomatis jalan setiap 12 jam
+  workflow_dispatch:        # Bisa dijalankan manual kapan saja
   repository_dispatch:
     types: [sync-cloudflare-gdrive]
 
@@ -12,9 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  export-and-sync:
+  sync-schema:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
 
     steps:
       - name: Checkout Public Runner
@@ -25,17 +25,13 @@ jobs:
         with:
           node-version: '24'
 
-      - name: Ekspor D1 & Nama Env Workers ke CSV
+      - name: Ekspor Skema Env & D1 (2 Worker Inti)
         env:
-          PUSAT_WORKER_URL: ${{ secrets.PUSAT_API_URL || 'https://dashboard-admin-pusat.accessed.workers.dev' }}
-          MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CF_EMAIL: ${{ secrets.CF_EMAIL }}
           CF_GLOBAL_KEY: ${{ secrets.CF_GLOBAL_KEY }}
-          PERSONAL_WORKERS: 'dashboard-cms-custom,dashboard-admin-pusat'
+          PERSONAL_WORKERS: 'dashboard-admin-pusat,dashboard-cms-custom'
         run: node scripts/sync-cloudflare-to-gdrive.js
 
       - name: Install Rclone (di /tmp)
@@ -47,7 +43,7 @@ jobs:
           sudo chmod +x /usr/local/bin/rclone
           rm -rf /tmp/rclone-current-linux-amd64.zip /tmp/rclone-*-linux-amd64
 
-      - name: Sync CSV ke Google Drive
+      - name: Sync ke Google Drive (Bersihkan File Lama Otomatis)
         env:
           RCLONE_CONFIG_GDRIVE_TYPE: drive
           RCLONE_CONFIG_GDRIVE_SCOPE: drive
@@ -55,6 +51,4 @@ jobs:
         run: |
           rclone sync ./gdrive_cf_export "gdrive:Dashboard_System/Cloudflare_Sync" \
             --fast-list \
-            --checkers 16 \
-            --transfers 8 \
             --verbose

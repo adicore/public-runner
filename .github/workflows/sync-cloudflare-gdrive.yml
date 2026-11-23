@@ -1,0 +1,60 @@
+name: Sync Cloudflare D1 & Worker Envs to Google Drive
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Otomatis jalan setiap 6 jam
+  workflow_dispatch:       # Bisa dijalankan manual kapan saja dari tab Actions
+  repository_dispatch:
+    types: [sync-cloudflare-gdrive]
+
+concurrency:
+  group: sync-cloudflare-gdrive
+  cancel-in-progress: true
+
+jobs:
+  export-and-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout Public Runner
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Ekspor D1 & Nama Env Workers ke CSV
+        env:
+          PUSAT_WORKER_URL: ${{ secrets.PUSAT_API_URL || 'https://dashboard-admin-pusat.accessed.workers.dev' }}
+          MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_EMAIL: ${{ secrets.CF_EMAIL }}
+          CF_GLOBAL_KEY: ${{ secrets.CF_GLOBAL_KEY }}
+          PERSONAL_WORKERS: 'dashboard-cms-custom,dashboard-admin-pusat'
+        run: node scripts/sync-cloudflare-to-gdrive.js
+
+      - name: Install Rclone (di /tmp)
+        run: |
+          cd /tmp
+          curl -sO https://downloads.rclone.org/rclone-current-linux-amd64.zip
+          unzip -q rclone-current-linux-amd64.zip
+          sudo cp rclone-*-linux-amd64/rclone /usr/local/bin/
+          sudo chmod +x /usr/local/bin/rclone
+          rm -rf /tmp/rclone-current-linux-amd64.zip /tmp/rclone-*-linux-amd64
+
+      - name: Sync CSV ke Google Drive
+        env:
+          RCLONE_CONFIG_GDRIVE_TYPE: drive
+          RCLONE_CONFIG_GDRIVE_SCOPE: drive
+          RCLONE_CONFIG_GDRIVE_TOKEN: ${{ secrets.GDRIVE_TOKEN_JSON }}
+        run: |
+          rclone sync ./gdrive_cf_export "gdrive:Dashboard_System/Cloudflare_Sync" \
+            --fast-list \
+            --checkers 16 \
+            --transfers 8 \
+            --verbose

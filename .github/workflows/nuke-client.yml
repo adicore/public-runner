@@ -1,0 +1,64 @@
+name: Nuke Client Infrastructure (Cloudflare & GitHub)
+
+on:
+  repository_dispatch:
+    types: [nuke-client]
+  workflow_dispatch:
+    inputs:
+      worker_name:
+        description: 'Nama Worker Klien yang akan dihapus permanen (contoh: cms-namaklien atau namaklien)'
+        required: true
+        type: string
+      job_id:
+        description: 'ID Job Notifikasi dari Dashboard Pusat (opsional)'
+        required: false
+        default: ''
+        type: string
+      reason:
+        description: 'Alasan penghapusan klien (opsional)'
+        required: false
+        default: 'Manual dispatch via GitHub Actions'
+        type: string
+
+concurrency:
+  group: nuke-client-${{ github.event.client_payload.worker_name || github.event.inputs.worker_name || github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  nuke-client:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Private Repository (dashboard-pusat)
+        uses: actions/checkout@v4
+        with:
+          repository: adicore/dashboard-pusat
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci --no-audit --no-fund || npm install --no-audit --no-fund --prefer-offline
+
+      - name: Execute Full Client Nuke & Stream Progress to Dashboard Pusat
+        run: node scripts/nuke-client.js
+        env:
+          PUSAT_WORKER_URL: ${{ secrets.PUSAT_API_URL || 'https://dashboard-admin-pusat.accessed.workers.dev' }}
+          MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          GITHUB_PAT: ${{ secrets.SYNC_PAT }}
+          GITHUB_OWNER: ${{ secrets.GH_OWNER || 'adicore' }}
+          NUKE_PAYLOAD: ${{ github.event.client_payload && toJson(github.event.client_payload) || '' }}
+          INPUT_WORKER_NAME: ${{ github.event.inputs.worker_name || '' }}
+          INPUT_JOB_ID: ${{ github.event.inputs.job_id || '' }}
+          INPUT_REASON: ${{ github.event.inputs.reason || '' }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          GITHUB_REPOSITORY: ${{ github.repository }}

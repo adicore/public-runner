@@ -33,7 +33,7 @@ jobs:
           git clone https://${GH_PAT}@github.com/${GH_OWNER}/dashboard-assets.git temp-assets
           
           # Bersihkan folder assets lama di repo publik
-          rm -rf temp-assets/assets
+          cp -rf assets/* temp-assets/assets/
           
           # Buat kembali folder assets dan salin seluruh subfolder (termasuk js/modules/)
           mkdir -p temp-assets/assets

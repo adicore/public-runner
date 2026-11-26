@@ -3,10 +3,6 @@ name: Sync Any Repo to Google Drive
 on:
   repository_dispatch:
     types: [sync-repo-to-gdrive]
-  push:
-    branches:
-      - main
-      - master
   workflow_dispatch:
     inputs:
       repo_name:
@@ -15,7 +11,7 @@ on:
 
 concurrency:
   group: gdrive-sync-${{ github.event.client_payload.repo_name || github.event.inputs.repo_name || github.event.repository.name }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   sync-to-gdrive:
@@ -30,6 +26,10 @@ jobs:
             REPO="${{ github.event.inputs.repo_name }}"
           else
             REPO="${{ github.event.repository.name }}"
+          fi
+          if [ -z "$REPO" ]; then
+            echo "Nama repository kosong"
+            exit 1
           fi
           echo "repo_name=$REPO" >> $GITHUB_OUTPUT
 

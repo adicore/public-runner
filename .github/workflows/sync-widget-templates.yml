@@ -1,0 +1,74 @@
+name: Sync Unified Widget Templates (Pusat <-> Travego)
+
+on:
+  workflow_dispatch:
+    inputs:
+      push_to_d1:
+        description: 'Push juga ke D1 Worker Pusat (/api/widgets/save)'
+        required: false
+        default: 'true'
+  repository_dispatch:
+    types: [sync-widget-templates]
+
+concurrency:
+  group: sync-widget-templates
+  cancel-in-progress: true
+
+jobs:
+  sync-widgets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Checkout dashboard-pusat
+        uses: actions/checkout@v4
+        with:
+          repository: adicore/dashboard-pusat
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+          path: dashboard-pusat
+
+      - name: Checkout dashboard_travego
+        uses: actions/checkout@v4
+        with:
+          repository: adicore/dashboard_travego
+          token: ${{ secrets.SYNC_PAT }}
+          ref: main
+          path: dashboard_travego
+
+      - name: Jalankan Penyatuan Acuan Widget
+        env:
+          PUSAT_DIR: ${{ github.workspace }}/dashboard-pusat
+          TRAVEGO_DIR: ${{ github.workspace }}/dashboard_travego
+          PUSAT_WORKER_URL: ${{ secrets.PUSAT_API_URL }}
+          MASS_UPDATE_PASSWORD: ${{ secrets.MASS_UPDATE_PASSWORD }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          TARGET_TEMPLATE_ID: 'tpl_blog_v1'
+        run: |
+          if [ "${{ github.event.inputs.push_to_d1 || 'true' }}" = "true" ]; then
+            node dashboard-pusat/scripts/sync-widget-templates.js --push-pusat
+          else
+            node dashboard-pusat/scripts/sync-widget-templates.js
+          fi
+
+      - name: Commit & Push Perubahan ke dashboard-pusat
+        working-directory: dashboard-pusat
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add templates/
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: sync unified widget templates" && git push origin main)
+
+      - name: Commit & Push Perubahan ke dashboard_travego
+        working-directory: dashboard_travego
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/api/tools.js assets/js/widgets-js.js
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: sync unified widget templates from pusat" && git push origin main)

@@ -63,7 +63,11 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add templates/
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: sync unified widget templates" && git push origin main)
+          if ! git diff --quiet || ! git diff --staged --quiet; then
+            git commit -m "chore: sync unified widget templates"
+            git pull --rebase origin main
+            git push origin main
+          fi
 
       - name: Commit & Push Perubahan ke dashboard_travego
         working-directory: dashboard_travego
@@ -71,4 +75,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add src/api/tools.js assets/js/widgets-js.js
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: sync unified widget templates from pusat" && git push origin main)
+          if ! git diff --quiet || ! git diff --staged --quiet; then
+            git commit -m "chore: sync unified widget templates from pusat"
+            git pull --rebase origin main
+            git push origin main
+          fi
